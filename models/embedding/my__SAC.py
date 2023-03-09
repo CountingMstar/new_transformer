@@ -4,8 +4,7 @@ Created on Wed Nov  6 12:24:34 2019
 @author: Z0014354
 
 https://github.com/BY571/Soft-Actor-Critic-and-Extensions
-python my_SAC.py -env Pendulum-v1 -ep 200 -info sac
-python my_SAC.py -ep 10000 -info sac
+python my__SAC.py -env Pendulum-v1 -ep 200 -info sac
 """
 
 
@@ -25,7 +24,6 @@ from torch.utils.tensorboard import SummaryWriter
 import argparse
 
 from game import PE_GAME
-import pickle
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -118,10 +116,7 @@ class Critic(nn.Module):
         self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(state_size+action_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
-        ###########################
-        # self.fc3 = nn.Linear(hidden_size, 1)
-        self.fc3 = nn.Linear(hidden_size, action_size)
-        ###########################
+        self.fc3 = nn.Linear(hidden_size, 1)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -194,8 +189,10 @@ class Agent():
     
     def act(self, state):
         """Returns actions for given state as per current policy."""
-        state = np.array((state.view(1, -1)).tolist())
+        print('==========================')
+        print(state)
         state = torch.from_numpy(state).float().to(device)
+        print(state)
         action = self.actor_local.get_action(state).detach()
         # print('#####action###')
         # print(action)
@@ -220,17 +217,15 @@ class Agent():
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models
         next_action, log_pis_next = self.actor_local.evaluate(next_states)
-        # print('#################################')
-        # print(next_action.shape)
-        # print(log_pis_next.shape)
+        print('#################################')
+        print(next_action.shape)
+        print(log_pis_next.shape)
 
         Q_target1_next = self.critic1_target(next_states.to(device), next_action.squeeze(0).to(device))
         Q_target2_next = self.critic2_target(next_states.to(device), next_action.squeeze(0).to(device))
-        # print(Q_target1_next.shape)
 
         # take the mean of both critics for updating
         Q_target_next = torch.min(Q_target1_next, Q_target2_next)
-        # print(Q_target_next.shape)
         
         if FIXED_ALPHA == None:
             # Compute Q targets for current states (y_i)
@@ -240,8 +235,9 @@ class Agent():
         # Compute critic loss
         Q_1 = self.critic1(states, actions).cpu()
         Q_2 = self.critic2(states, actions).cpu()
-        # print(Q_1.shape)
-        # print(Q_targets.detach().shape)
+        
+        print(Q_1.shape)
+        print(Q_targets.detach().shape)
         critic1_loss = 0.5*F.mse_loss(Q_1, Q_targets.detach())
         critic2_loss = 0.5*F.mse_loss(Q_2, Q_targets.detach())
         # Update critics
@@ -325,28 +321,16 @@ class ReplayBuffer:
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
         e = self.experience(state, action, reward, next_state, done)
-        # print('=====-----')
-        
-        # if e.state.shape[0] == 4:
-        #     print('++++++++++')
-        #     print(e)
         self.memory.append(e)
     
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)
         # print('***************')
-        # # print(experiences)
-
-        # i = 0
-        # for e in experiences:
-        #     if e is not None:
-        #         print('$$$$$')
-        #         print(i)
-        #         i += 1
-        #         print(e.state.shape[0])
-
+        # print(experiences)
+        
         states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(device)
+        # print(states)
         actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(device)
         next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(device)
@@ -363,15 +347,13 @@ class ReplayBuffer:
 def SAC(n_episodes=200, max_t=500, print_every=10):
     scores_deque = deque(maxlen=100)
     average_100_scores = []
-    total_list = []
 
     for i_episode in range(1, n_episodes+1):
 
-        state = env.reset().view(1, -1)
-        # state = state.view(1, -1)
+        state = env.reset()
         # print('###state###')
         # print(state)
-        # state = state.reshape((1,state_size))
+        state = state.reshape((1,state_size))
         # print(state)
         score = 0
         for t in range(max_t):
@@ -379,17 +361,14 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
 
             action = agent.act(state)
             action_v = action.numpy()
-            # print('##########last#######')
-            # print(action.shape)
+
+            # print('#################')
             # print(action_high)
             action_v = np.clip(action_v*action_high, action_low, action_high)
             # print(action_v)
-            action_v = torch.tensor(action_v)
-            # print(action_v)
-            next_state, reward, done = env.step(action_v)
-            # print(next_state)
+
+            next_state, reward, done, info = env.step(action_v)
             next_state = next_state.reshape((1,state_size))
-            # print(next_state)
             agent.step(state, action, reward, next_state, done, t)
             state = next_state
             score += reward
@@ -403,17 +382,8 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
         average_100_scores.append(np.mean(scores_deque))
         
         print('\rEpisode {} Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
-        total_list.append(score)
-        # print(total_list)
-        with open('result/scores.pkl', 'wb') as f:
-            pickle.dump(total_list, f)
-
         if i_episode % print_every == 0:
             print('\rEpisode {}  Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
-            total_list.append(score)
-            # print(total_list)
-            with open('result/scores.pkl', 'wb') as f:
-                pickle.dump(total_list, f)
             
             
     torch.save(agent.actor_local.state_dict(), args.info + ".pt")
@@ -458,7 +428,7 @@ parser.add_argument("--saved_model", type=str, default=None, help="Load a saved 
 args = parser.parse_args()
 
 if __name__ == "__main__":
-    # env_name = args.env
+    env_name = args.env
     seed = args.seed
     n_episodes = args.ep
     GAMMA = args.gamma
@@ -474,18 +444,14 @@ if __name__ == "__main__":
     t0 = time.time()
     writer = SummaryWriter("runs/"+args.info)
 
-    # d_model = 3
-    # max_len = 4
-    d_model = 10
-    max_len = 10
-    env = PE_GAME(d_model, max_len)
+    env = gym.make(env_name)
 
     """
     여기서는 -2 ~ 2
     우리는 -1 ~ 1로 한다
     """
-    action_high = 1
-    action_low = -1
+    action_high = env.action_space.high[0]
+    action_low = env.action_space.low[0]
     # print('#####action####')
     # print(action_high)
     # print(action_low)
@@ -494,15 +460,15 @@ if __name__ == "__main__":
     동일한 seed를 가지면, 동일한 랜덤 숫자를 갖는다
     """
     torch.manual_seed(seed)
-    # env.seed(seed)
+    env.seed(seed)
     np.random.seed(seed)
 
     """
     state, action의 size
     여기서 3, 1
     """
-    state_size = env.state_size
-    action_size = env.action_size
+    state_size = env.observation_space.shape[0]
+    action_size = env.action_space.shape[0]
     # print('#####size####')
     # print(state_size)
     # print(action_size)
