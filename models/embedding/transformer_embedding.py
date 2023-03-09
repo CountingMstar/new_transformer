@@ -87,7 +87,7 @@ class TransformerEmbedding(nn.Module):
         # torch.Size([128, 34, 512])
 
         model = SummationEmbedding(
-            tok_emb, pos_emb, cat_tok_emb, cat_pos_emb, self.linearlayer
+            tok_emb, pos_emb, cat_tok_emb, cat_pos_emb, self.linearlayer, self.d_model
         )
         """
         positional encoding type 결정
@@ -104,7 +104,7 @@ class TransformerEmbedding(nn.Module):
 
 class SummationEmbedding(TransformerEmbedding):
     def __init__(
-        self, token_emb, positional_emb, cat_token_emb, cat_positional_emb, linearlayer
+        self, token_emb, positional_emb, cat_token_emb, cat_positional_emb, linearlayer, d_model
     ):
         super(TransformerEmbedding, self).__init__()
 
@@ -112,8 +112,7 @@ class SummationEmbedding(TransformerEmbedding):
         self.positional_emb = positional_emb
         self.cat_token_emb = cat_token_emb
         self.cat_positional_emb = cat_positional_emb
-
-        self.d_model = 512
+        self.d_model = d_model
 
         """
         from models.embedding.autoencoder import LinearLayer의
