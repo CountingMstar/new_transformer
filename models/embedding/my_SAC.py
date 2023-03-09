@@ -364,6 +364,7 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
     scores_deque = deque(maxlen=100)
     average_100_scores = []
     total_list = []
+    total_avg_list = []
 
     for i_episode in range(1, n_episodes+1):
 
@@ -404,16 +405,22 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
         
         print('\rEpisode {} Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
         total_list.append(score)
+        total_avg_list.append(np.mean(scores_deque))
         # print(total_list)
         with open('result/scores.pkl', 'wb') as f:
             pickle.dump(total_list, f)
+        with open('result/avg_scores.pkl', 'wb') as f:
+            pickle.dump(total_avg_list, f)
 
         if i_episode % print_every == 0:
             print('\rEpisode {}  Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
             total_list.append(score)
+            total_avg_list.append(np.mean(scores_deque))
             # print(total_list)
             with open('result/scores.pkl', 'wb') as f:
                 pickle.dump(total_list, f)
+            with open('result/avg_scores.pkl', 'wb') as f:
+                pickle.dump(total_avg_list, f)
             
             
     torch.save(agent.actor_local.state_dict(), args.info + ".pt")
