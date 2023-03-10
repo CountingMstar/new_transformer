@@ -6,6 +6,7 @@ Created on Wed Nov  6 12:24:34 2019
 https://github.com/BY571/Soft-Actor-Critic-and-Extensions
 python my_SAC.py -env Pendulum-v1 -ep 200 -info sac
 python my_SAC.py -ep 10000 -info sac
+python my_SAC.py --saved_model 1
 """
 
 
@@ -119,6 +120,10 @@ class Critic(nn.Module):
         self.fc1 = nn.Linear(state_size+action_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         ###########################
+        """
+        NN의 마지막 부분이 action이 됨
+        즉 action size만큼의 크기를 가져야함
+        """
         # self.fc3 = nn.Linear(hidden_size, 1)
         self.fc3 = nn.Linear(hidden_size, action_size)
         ###########################
@@ -197,8 +202,6 @@ class Agent():
         state = np.array((state.view(1, -1)).tolist())
         state = torch.from_numpy(state).float().to(device)
         action = self.actor_local.get_action(state).detach()
-        # print('#####action###')
-        # print(action)
         return action
 
     def learn(self, step, experiences, gamma, d=1):
@@ -220,17 +223,12 @@ class Agent():
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models
         next_action, log_pis_next = self.actor_local.evaluate(next_states)
-        # print('#################################')
-        # print(next_action.shape)
-        # print(log_pis_next.shape)
 
         Q_target1_next = self.critic1_target(next_states.to(device), next_action.squeeze(0).to(device))
         Q_target2_next = self.critic2_target(next_states.to(device), next_action.squeeze(0).to(device))
-        # print(Q_target1_next.shape)
 
         # take the mean of both critics for updating
         Q_target_next = torch.min(Q_target1_next, Q_target2_next)
-        # print(Q_target_next.shape)
         
         if FIXED_ALPHA == None:
             # Compute Q targets for current states (y_i)
@@ -240,8 +238,7 @@ class Agent():
         # Compute critic loss
         Q_1 = self.critic1(states, actions).cpu()
         Q_2 = self.critic2(states, actions).cpu()
-        # print(Q_1.shape)
-        # print(Q_targets.detach().shape)
+
         critic1_loss = 0.5*F.mse_loss(Q_1, Q_targets.detach())
         critic2_loss = 0.5*F.mse_loss(Q_2, Q_targets.detach())
         # Update critics
@@ -325,78 +322,64 @@ class ReplayBuffer:
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
         e = self.experience(state, action, reward, next_state, done)
-        # print('=====-----')
-        
-        # if e.state.shape[0] == 4:
-        #     print('++++++++++')
-        #     print(e)
         self.memory.append(e)
     
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)
-        # print('***************')
-        # # print(experiences)
-
-        # i = 0
-        # for e in experiences:
-        #     if e is not None:
-        #         print('$$$$$')
-        #         print(i)
-        #         i += 1
-        #         print(e.state.shape[0])
-
         states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(device)
         actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(device)
         next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(device)
         dones = torch.from_numpy(np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(device)
-
         return (states, actions, rewards, next_states, dones)
 
     def __len__(self):
         """Return the current size of internal memory."""
         return len(self.memory)
     
-    
-    
 def SAC(n_episodes=200, max_t=500, print_every=10):
+# def SAC(n_episodes=200, max_t=500, print_every=10, d_model, max_len):
     scores_deque = deque(maxlen=100)
     average_100_scores = []
     total_list = []
     total_avg_list = []
+    best_states = []
+    version = (d_model, max_len)
 
     for i_episode in range(1, n_episodes+1):
 
         state = env.reset().view(1, -1)
-        # state = state.view(1, -1)
-        # print('###state###')
-        # print(state)
-        # state = state.reshape((1,state_size))
-        # print(state)
         score = 0
         for t in range(max_t):
-
-
             action = agent.act(state)
             action_v = action.numpy()
-            # print('##########last#######')
-            # print(action.shape)
-            # print(action_high)
             action_v = np.clip(action_v*action_high, action_low, action_high)
-            # print(action_v)
             action_v = torch.tensor(action_v)
-            # print(action_v)
+
             next_state, reward, done = env.step(action_v)
-            # print(next_state)
             next_state = next_state.reshape((1,state_size))
-            # print(next_state)
             agent.step(state, action, reward, next_state, done, t)
             state = next_state
             score += reward
+        
+        state_plus_reward = [reward, state]
 
-            if done:
-                break 
+        # store best 5 states
+        if len(best_states) < 5:
+            best_states.append(state_plus_reward)
+        elif len(best_states) == 5:
+            re = [rs[0] for rs in best_states]
+            min_index = re.index(min(re))
+            if min(re) < reward:
+                del best_states[min_index]
+                best_states.append(state_plus_reward)
+
+        if i_episode%50 == 0:
+            bs = [(rs[0], rs[1]) for rs in best_states]
+            for r, s in bs:
+                with open('result2/state_'+ str(version) + str(round(r, 3)) + '.pkl', 'wb') as f:
+                    pickle.dump(s, f)
         
         scores_deque.append(score)
         writer.add_scalar("Reward", score, i_episode)
@@ -406,48 +389,58 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
         print('\rEpisode {} Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
         total_list.append(score)
         total_avg_list.append(np.mean(scores_deque))
-        # print(total_list)
-        with open('result/scores.pkl', 'wb') as f:
+
+        # store score and average score
+        with open('result2/scores' + str(version) + '.pkl', 'wb') as f:
             pickle.dump(total_list, f)
-        with open('result/avg_scores.pkl', 'wb') as f:
+        with open('result2/avg_scores' + str(version) + '.pkl', 'wb') as f:
             pickle.dump(total_avg_list, f)
 
         if i_episode % print_every == 0:
             print('\rEpisode {}  Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
             total_list.append(score)
             total_avg_list.append(np.mean(scores_deque))
-            # print(total_list)
-            with open('result/scores.pkl', 'wb') as f:
+ 
+            with open('result2/scores' + str(version) + '.pkl', 'wb') as f:
                 pickle.dump(total_list, f)
-            with open('result/avg_scores.pkl', 'wb') as f:
+            with open('result2/avg_scores' + str(version) + '.pkl', 'wb') as f:
                 pickle.dump(total_avg_list, f)
-            
             
     torch.save(agent.actor_local.state_dict(), args.info + ".pt")
     
-
-
-
 def play():
     agent.actor_local.eval()
     for i_episode in range(1):
+        state = env.reset().view(1, -1)
 
-        state = env.reset()
-        state = state.reshape((1,state_size))
-
-        while True:
+        for t in range(1000):
             action = agent.act(state)
-            action_v = action[0].numpy()
+            action_v = action.numpy()
             action_v = np.clip(action_v*action_high, action_low, action_high)
-            next_state, reward, done, info = env.step(action_v)
+            action_v = torch.tensor(action_v)
+            next_state, reward, done = env.step(action_v)
             next_state = next_state.reshape((1,state_size))
+            agent.step(state, action, reward, next_state, done, t)
             state = next_state
 
-            if done:
-                break 
+# def play():
+#     agent.actor_local.eval()
+#     for i_episode in range(1):
+
+#         state = env.reset()
+#         state = state.reshape((1,state_size))
+
+#         while True:
+#             action = agent.act(state)
+#             action_v = action[0].numpy()
+#             action_v = np.clip(action_v*action_high, action_low, action_high)
+#             next_state, reward, done, info = env.step(action_v)
+#             next_state = next_state.reshape((1,state_size))
+#             state = next_state
+
+#             if done:
+#                 break 
     
-
-
 parser = argparse.ArgumentParser(description="")
 parser.add_argument("-env", type=str,default="Pendulum-v0", help="Environment name")
 parser.add_argument("-info", type=str, help="Information or name of the run")
@@ -465,7 +458,6 @@ parser.add_argument("--saved_model", type=str, default=None, help="Load a saved 
 args = parser.parse_args()
 
 if __name__ == "__main__":
-    # env_name = args.env
     seed = args.seed
     n_episodes = args.ep
     GAMMA = args.gamma
@@ -481,10 +473,14 @@ if __name__ == "__main__":
     t0 = time.time()
     writer = SummaryWriter("runs/"+args.info)
 
-    # d_model = 3
-    # max_len = 4
-    d_model = 10
-    max_len = 10
+    """
+    d_model: dimension
+    max_len: maxium length
+    """
+    d_model = 5
+    max_len = 50
+    print('###################version###################')
+    print('This version is' + str((d_model, max_len)))
     env = PE_GAME(d_model, max_len)
 
     """
@@ -493,9 +489,6 @@ if __name__ == "__main__":
     """
     action_high = 1
     action_low = -1
-    # print('#####action####')
-    # print(action_high)
-    # print(action_low)
 
     """
     동일한 seed를 가지면, 동일한 랜덤 숫자를 갖는다
@@ -505,14 +498,12 @@ if __name__ == "__main__":
     np.random.seed(seed)
 
     """
-    state, action의 size
-    여기서 3, 1
+    define state size and action size
+    state size = action size = d_model * max_len
     """
     state_size = env.state_size
     action_size = env.action_size
-    # print('#####size####')
-    # print(state_size)
-    # print(action_size)
+
     agent = Agent(state_size=state_size, action_size=action_size, random_seed=seed,hidden_size=HIDDEN_SIZE, action_prior="uniform") #"normal"
     
     if saved_model != None:
@@ -520,7 +511,7 @@ if __name__ == "__main__":
         play()
     else:    
         SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every)
+        # SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every, d_model, max_len)
     t1 = time.time()
     env.close()
     print("training took {} min!".format((t1-t0)/60))
-

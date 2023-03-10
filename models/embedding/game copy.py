@@ -23,27 +23,24 @@ class PE_GAME:
         next_state = self.state
 
         reward_list = []
-        # total = []
         for i in range(self.max_len):
-            for j in range(self.max_len - i):
-                x = j + i
+            m = round((self.max_len-1)/2)
+            for j in range(self.max_len - (i+1)):
+                k = j + i + 1
                 """
-                y는 이상적인 정답함수
+                (i, k) == (행, 렬)
                 """
-                # print(i, x)
-                # tmp = []
-                # tmp.append([i, x])
-
-                y = ((-1-(+1))/(self.max_len-1))*(x-i) + 1
-                # print('y')
-                # print(y)
-
                 vector1 = action[i].tolist()
-                vector2 = action[x].tolist()
-                similarity = cosine_similarity([vector1], [vector2])
-
-                reward = -((y - similarity) ** 2)
-                reward_list.append(reward)
+                vector2 = action[k].tolist()
+                """
+                중간값 m을 기준으로 이보다 작은면 +reward, 크면 -reward
+                -> 거리가 가까우면 유사도를 크게, 멀면 유사도를 작게 하기위해
+                """
+                if k <= m+i:
+                    similarity = cosine_similarity([vector1], [vector2])
+                if k > m+i:
+                    similarity = -cosine_similarity([vector1], [vector2])
+                reward_list.append(similarity)
         reward = sum(reward_list)[0][0]
         # print(reward_list)
         done = False

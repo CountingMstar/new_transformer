@@ -15,7 +15,7 @@ def positional_encoding(d_model, max_len):
     return encoding[:, :] 
 
 d_model = 10
-max_len = 50
+max_len = 10
 
 pos_encoding = positional_encoding(d_model, max_len)
 print('######pos_encoding#####')

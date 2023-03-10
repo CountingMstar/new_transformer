@@ -21,3 +21,9 @@ plt.grid(True, which="both", axis="both")
 plt.savefig("result")
 
 plt.show()
+
+# score = 24.800000021457606
+# with open('state_reward-'+ str(score) +'.pkl', 'rb') as f:
+#     total_list = pickle.load(f)
+
+# print(total_list)
