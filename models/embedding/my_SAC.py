@@ -6,7 +6,8 @@ Created on Wed Nov  6 12:24:34 2019
 https://github.com/BY571/Soft-Actor-Critic-and-Extensions
 python my_SAC.py -env Pendulum-v1 -ep 200 -info sac
 python my_SAC.py -ep 10000 -info sac
-python my_SAC.py --saved_model 1
+python my_SAC.py -ep 10000 -info sac -lr 5e-5
+# python my_SAC.py --saved_model 1?
 """
 
 
@@ -345,7 +346,7 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
     total_list = []
     total_avg_list = []
     best_states = []
-    version = (d_model, max_len)
+    version = (d_model, max_len, max_t)
 
     for i_episode in range(1, n_episodes+1):
 
@@ -477,10 +478,13 @@ if __name__ == "__main__":
     d_model: dimension
     max_len: maxium length
     """
-    d_model = 5
+    d_model = 4
     max_len = 50
+    max_t = 500
     print('###################version###################')
-    print('This version is' + str((d_model, max_len)))
+    print('This version is ' + str((d_model, max_len)))
+    print('Learning rate is ' + str(args.lr))
+    print('One episode is ' + str(max_t) + ' steps')
     env = PE_GAME(d_model, max_len)
 
     """
@@ -510,8 +514,8 @@ if __name__ == "__main__":
         agent.actor_local.load_state_dict(torch.load(saved_model))
         play()
     else:    
-        SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every)
-        # SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every, d_model, max_len)
+        SAC(n_episodes=args.ep, max_t=max_t, print_every=args.print_every)
+        # SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every)
     t1 = time.time()
     env.close()
     print("training took {} min!".format((t1-t0)/60))

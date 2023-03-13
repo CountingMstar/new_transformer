@@ -16,18 +16,25 @@ def positional_encoding(d_model, max_len):
 
     return encoding[:, :] 
 
-d_model = 10
-max_len = 10
+########################
+d_model = 4
+max_len = 50
+########################
 
 pos_encoding = positional_encoding(d_model, max_len)
 pos_encoding = pos_encoding.view(1, -1)
 zero_encoding = torch.zeros(d_model*max_len)
 one_encoding = torch.ones(d_model*max_len)
 
-# proposed method
-score = -0.1
-with open('state_'+ str(score) +'.pkl', 'rb') as f:
-    total_list = pickle.load(f)
+########################
+# # proposed method
+# score = -270.31
+# version = (d_model, max_len)
+# # version = (d_model, max_len, 500)
+# # with open('state_'+ str(score) +'.pkl', 'rb') as f:
+# with open('state_'+ str(version) + str(score) +'.pkl', 'rb') as f:
+#     total_list = pickle.load(f)
+########################
 # print('#####MAX#####')
 # print(total_list)
 
@@ -40,11 +47,11 @@ linear = torch.tensor(x)
 
 env = PE_GAME(d_model, max_len)
 env.reset()
-# next_state, reward, done = env.step(pos_encoding)
+next_state, reward, done = env.step(pos_encoding)
 # next_state, reward, done = env.step(zero_encoding)
 # next_state, reward, done = env.step(one_encoding)
 # next_state, reward, done = env.step(linear)
-next_state, reward, done = env.step(total_list)
+# next_state, reward, done = env.step(total_list)
 
 print("#####reward#####")
 print(reward)
@@ -55,7 +62,8 @@ print(next_state.shape)
 print(next_state)
 
 plt.figure(figsize=(10, 8))
-plt.pcolormesh(pos_encoding, cmap='RdBu')
+# plt.pcolormesh(pos_encoding, cmap='RdBu')
+plt.pcolormesh(next_state, cmap='RdBu')
 plt.xlabel('Embedding Dimension')
 plt.xlim((0, d_model))
 plt.ylabel('Sequence Position')
