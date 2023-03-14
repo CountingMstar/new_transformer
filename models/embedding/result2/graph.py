@@ -1,9 +1,17 @@
 ﻿import matplotlib.pyplot as plt
 import pickle
 
-d_model = 4
-max_len = 50
-version = (d_model, max_len, 50)
+# d_model = 4
+# max_len = 50
+# version = (d_model, max_len, 500)
+
+d_model = 10
+max_len = 10
+version = (d_model, max_len, 1)
+
+# d_model = 4
+# max_len = 50
+# version = (d_model, max_len, 1)
 
 # d_model = 5
 # max_len = 50

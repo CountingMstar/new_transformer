@@ -17,23 +17,29 @@ def positional_encoding(d_model, max_len):
     return encoding[:, :] 
 
 ########################
-d_model = 4
-max_len = 50
+d_model = 10
+max_len = 10
+max_t = 1
+score = -0.5
+
+# d_model = 4
+# max_len = 50
+# max_t = 1
+# score = -473.825
 ########################
 
 pos_encoding = positional_encoding(d_model, max_len)
-pos_encoding = pos_encoding.view(1, -1)
-zero_encoding = torch.zeros(d_model*max_len)
-one_encoding = torch.ones(d_model*max_len)
+# pos_encoding = pos_encoding.view(1, -1)
+# zero_encoding = torch.zeros(d_model*max_len)
+# one_encoding = torch.ones(d_model*max_len)
 
 ########################
-# # proposed method
-# score = -270.31
+# proposed method
 # version = (d_model, max_len)
-# # version = (d_model, max_len, 500)
-# # with open('state_'+ str(score) +'.pkl', 'rb') as f:
-# with open('state_'+ str(version) + str(score) +'.pkl', 'rb') as f:
-#     total_list = pickle.load(f)
+version = (d_model, max_len, max_t)
+# with open('state_'+ str(score) +'.pkl', 'rb') as f:
+with open('state_'+ str(version) + str(score) +'.pkl', 'rb') as f:
+    total_list = pickle.load(f)
 ########################
 # print('#####MAX#####')
 # print(total_list)
@@ -47,11 +53,11 @@ linear = torch.tensor(x)
 
 env = PE_GAME(d_model, max_len)
 env.reset()
-next_state, reward, done = env.step(pos_encoding)
+# next_state, reward, done = env.step(pos_encoding)
 # next_state, reward, done = env.step(zero_encoding)
 # next_state, reward, done = env.step(one_encoding)
 # next_state, reward, done = env.step(linear)
-# next_state, reward, done = env.step(total_list)
+next_state, reward, done = env.step(total_list)
 
 print("#####reward#####")
 print(reward)
@@ -71,7 +77,7 @@ plt.ylim((0, max_len))
 plt.colorbar()
 plt.title('Positional Encoding Visualization')
 plt.savefig("result_heatmap_total_list2", path="/home/moonstar/python/NLP/new_transformer/models/embedding/result2")
-# plt.show()
+plt.show()
 
 
 

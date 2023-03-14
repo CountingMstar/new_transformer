@@ -5,7 +5,8 @@ Created on Wed Nov  6 12:24:34 2019
 
 https://github.com/BY571/Soft-Actor-Critic-and-Extensions
 python my_SAC.py -env Pendulum-v1 -ep 200 -info sac
-python my_SAC.py -ep 10000 -info sac
+python my_SAC.py -ep 100000000 -info sac
+python my_SAC.py -ep 100000000 -info sac -lr 5e-5
 python my_SAC.py -ep 10000 -info sac -lr 5e-5
 # python my_SAC.py --saved_model 1?
 """
@@ -480,7 +481,7 @@ if __name__ == "__main__":
     """
     d_model = 4
     max_len = 50
-    max_t = 500
+    max_t = 1
     print('###################version###################')
     print('This version is ' + str((d_model, max_len)))
     print('Learning rate is ' + str(args.lr))
