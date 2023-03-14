@@ -45,7 +45,7 @@ for version in ver:
         plt.title("training result")
         plt.grid(True, which="both", axis="both")
         plt.savefig("saved/transformer-base/" + mode + "-" + version)
-        plt.show()
+        # plt.show()
 
     if __name__ == "__main__":
         draw(mode="loss", version=version)

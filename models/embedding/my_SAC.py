@@ -6,6 +6,7 @@ Created on Wed Nov  6 12:24:34 2019
 https://github.com/BY571/Soft-Actor-Critic-and-Extensions
 python my_SAC.py -env Pendulum-v1 -ep 200 -info sac
 python my_SAC.py -ep 10000 -info sac
+python my_SAC.py -ep 100000000 -info sac -lr (5e-4)/2
 python my_SAC.py --saved_model 1
 """
 
@@ -13,7 +14,7 @@ python my_SAC.py --saved_model 1
 import numpy as np
 import random
 
-import gym
+# import gym
 from collections import namedtuple, deque
 import torch
 import torch.nn as nn
@@ -22,23 +23,36 @@ from torch.distributions import Normal, MultivariateNormal
 
 import torch.optim as optim
 import time
-from torch.utils.tensorboard import SummaryWriter
+
+# from torch.utils.tensorboard import SummaryWriter
 import argparse
 
 from game import PE_GAME
 import pickle
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+
 
 def hidden_init(layer):
     fan_in = layer.weight.data.size()[0]
-    lim = 1. / np.sqrt(fan_in)
+    lim = 1.0 / np.sqrt(fan_in)
     return (-lim, lim)
+
 
 class Actor(nn.Module):
     """Actor (Policy) Model."""
 
-    def __init__(self, state_size, action_size, seed, hidden_size=32, init_w=3e-3, log_std_min=-20, log_std_max=2):
+    def __init__(
+        self,
+        state_size,
+        action_size,
+        seed,
+        hidden_size=32,
+        init_w=3e-3,
+        log_std_min=-20,
+        log_std_max=2,
+    ):
         """Initialize parameters and build model.
         Params
         ======
@@ -52,13 +66,12 @@ class Actor(nn.Module):
         self.seed = torch.manual_seed(seed)
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
-        
+
         self.fc1 = nn.Linear(state_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
-        
+
         self.mu = nn.Linear(hidden_size, action_size)
         self.log_std_linear = nn.Linear(hidden_size, action_size)
-
 
     def reset_parameters(self):
         self.fc1.weight.data.uniform_(*hidden_init(self.fc1))
@@ -75,30 +88,31 @@ class Actor(nn.Module):
         log_std = self.log_std_linear(x)
         log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
         return mu, log_std
-    
+
     def evaluate(self, state, epsilon=1e-6):
         mu, log_std = self.forward(state)
         std = log_std.exp()
         dist = Normal(0, 1)
         e = dist.sample().to(device)
         action = torch.tanh(mu + e * std)
-        log_prob = Normal(mu, std).log_prob(mu + e * std) - torch.log(1 - action.pow(2) + epsilon)
+        log_prob = Normal(mu, std).log_prob(mu + e * std) - torch.log(
+            1 - action.pow(2) + epsilon
+        )
 
         return action, log_prob
-        
-    
+
     def get_action(self, state):
         """
         returns the action based on a squashed gaussian policy. That means the samples are obtained according to:
         a(s,e)= tanh(mu(s)+sigma(s)+e)
         """
-        #state = torch.FloatTensor(state).to(device) #.unsqzeeze(0)
+        # state = torch.FloatTensor(state).to(device) #.unsqzeeze(0)
         mu, log_std = self.forward(state)
         std = log_std.exp()
         dist = Normal(0, 1)
-        e      = dist.sample().to(device)
+        e = dist.sample().to(device)
         action = torch.tanh(mu + e * std).cpu()
-        #action = torch.clamp(action*action_high, action_low, action_high)
+        # action = torch.clamp(action*action_high, action_low, action_high)
         return action[0]
 
 
@@ -117,7 +131,7 @@ class Critic(nn.Module):
         """
         super(Critic, self).__init__()
         self.seed = torch.manual_seed(seed)
-        self.fc1 = nn.Linear(state_size+action_size, hidden_size)
+        self.fc1 = nn.Linear(state_size + action_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         ###########################
         """
@@ -141,12 +155,15 @@ class Critic(nn.Module):
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
-class Agent():
+
+class Agent:
     """Interacts with and learns from the environment."""
-    
-    def __init__(self, state_size, action_size, random_seed, hidden_size, action_prior="uniform"):
+
+    def __init__(
+        self, state_size, action_size, random_seed, hidden_size, action_prior="uniform"
+    ):
         """Initialize an Agent object.
-        
+
         Params
         ======
             state_size (int): dimension of each state
@@ -156,35 +173,48 @@ class Agent():
         self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(random_seed)
-        
+
         self.target_entropy = -action_size  # -dim(A)
         self.alpha = 1
         self.log_alpha = torch.tensor([0.0], requires_grad=True)
-        self.alpha_optimizer = optim.Adam(params=[self.log_alpha], lr=LR_ACTOR) 
+        self.alpha_optimizer = optim.Adam(params=[self.log_alpha], lr=LR_ACTOR)
         self._action_prior = action_prior
-        
+
         print("Using: ", device)
-        
-        # Actor Network 
-        self.actor_local = Actor(state_size, action_size, random_seed, hidden_size).to(device)
-        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR_ACTOR)     
-        
+
+        # Actor Network
+        self.actor_local = Actor(state_size, action_size, random_seed, hidden_size).to(
+            device
+        )
+        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR_ACTOR)
+
         # Critic Network (w/ Target Network)
-        self.critic1 = Critic(state_size, action_size, random_seed, hidden_size).to(device)
-        self.critic2 = Critic(state_size, action_size, random_seed, hidden_size).to(device)
-        
-        self.critic1_target = Critic(state_size, action_size, random_seed,hidden_size).to(device)
+        self.critic1 = Critic(state_size, action_size, random_seed, hidden_size).to(
+            device
+        )
+        self.critic2 = Critic(state_size, action_size, random_seed, hidden_size).to(
+            device
+        )
+
+        self.critic1_target = Critic(
+            state_size, action_size, random_seed, hidden_size
+        ).to(device)
         self.critic1_target.load_state_dict(self.critic1.state_dict())
 
-        self.critic2_target = Critic(state_size, action_size, random_seed,hidden_size).to(device)
+        self.critic2_target = Critic(
+            state_size, action_size, random_seed, hidden_size
+        ).to(device)
         self.critic2_target.load_state_dict(self.critic2.state_dict())
 
-        self.critic1_optimizer = optim.Adam(self.critic1.parameters(), lr=LR_CRITIC, weight_decay=0)
-        self.critic2_optimizer = optim.Adam(self.critic2.parameters(), lr=LR_CRITIC, weight_decay=0) 
+        self.critic1_optimizer = optim.Adam(
+            self.critic1.parameters(), lr=LR_CRITIC, weight_decay=0
+        )
+        self.critic2_optimizer = optim.Adam(
+            self.critic2.parameters(), lr=LR_CRITIC, weight_decay=0
+        )
 
         # Replay memory
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, random_seed)
-        
 
     def step(self, state, action, reward, next_state, done, step):
         """Save experience in replay memory, and use random sample from buffer to learn."""
@@ -195,8 +225,7 @@ class Agent():
         if len(self.memory) > BATCH_SIZE:
             experiences = self.memory.sample()
             self.learn(step, experiences, GAMMA)
-            
-    
+
     def act(self, state):
         """Returns actions for given state as per current policy."""
         state = np.array((state.view(1, -1)).tolist())
@@ -214,33 +243,44 @@ class Agent():
             critic_target(state, action) -> Q-value
         Params
         ======
-            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples 
+            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
             gamma (float): discount factor
         """
         states, actions, rewards, next_states, dones = experiences
-        
 
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models
         next_action, log_pis_next = self.actor_local.evaluate(next_states)
 
-        Q_target1_next = self.critic1_target(next_states.to(device), next_action.squeeze(0).to(device))
-        Q_target2_next = self.critic2_target(next_states.to(device), next_action.squeeze(0).to(device))
+        Q_target1_next = self.critic1_target(
+            next_states.to(device), next_action.squeeze(0).to(device)
+        )
+        Q_target2_next = self.critic2_target(
+            next_states.to(device), next_action.squeeze(0).to(device)
+        )
 
         # take the mean of both critics for updating
         Q_target_next = torch.min(Q_target1_next, Q_target2_next)
-        
+
         if FIXED_ALPHA == None:
             # Compute Q targets for current states (y_i)
-            Q_targets = rewards.cpu() + (gamma * (1 - dones.cpu()) * (Q_target_next.cpu() - self.alpha * log_pis_next.squeeze(0).cpu()))
+            Q_targets = rewards.cpu() + (
+                gamma
+                * (1 - dones.cpu())
+                * (Q_target_next.cpu() - self.alpha * log_pis_next.squeeze(0).cpu())
+            )
         else:
-            Q_targets = rewards.cpu() + (gamma * (1 - dones.cpu()) * (Q_target_next.cpu() - FIXED_ALPHA * log_pis_next.squeeze(0).cpu()))
+            Q_targets = rewards.cpu() + (
+                gamma
+                * (1 - dones.cpu())
+                * (Q_target_next.cpu() - FIXED_ALPHA * log_pis_next.squeeze(0).cpu())
+            )
         # Compute critic loss
         Q_1 = self.critic1(states, actions).cpu()
         Q_2 = self.critic2(states, actions).cpu()
 
-        critic1_loss = 0.5*F.mse_loss(Q_1, Q_targets.detach())
-        critic2_loss = 0.5*F.mse_loss(Q_2, Q_targets.detach())
+        critic1_loss = 0.5 * F.mse_loss(Q_1, Q_targets.detach())
+        critic2_loss = 0.5 * F.mse_loss(Q_2, Q_targets.detach())
         # Update critics
         # critic 1
         self.critic1_optimizer.zero_grad()
@@ -251,35 +291,52 @@ class Agent():
         critic2_loss.backward()
         self.critic2_optimizer.step()
         if step % d == 0:
-        # ---------------------------- update actor ---------------------------- #
+            # ---------------------------- update actor ---------------------------- #
             if FIXED_ALPHA == None:
                 alpha = torch.exp(self.log_alpha)
                 # Compute alpha loss
                 actions_pred, log_pis = self.actor_local.evaluate(states)
-                alpha_loss = - (self.log_alpha.cpu() * (log_pis.cpu() + self.target_entropy).detach().cpu()).mean()
+                alpha_loss = -(
+                    self.log_alpha.cpu()
+                    * (log_pis.cpu() + self.target_entropy).detach().cpu()
+                ).mean()
                 self.alpha_optimizer.zero_grad()
                 alpha_loss.backward()
                 self.alpha_optimizer.step()
-                
+
                 self.alpha = alpha
                 # Compute actor loss
                 if self._action_prior == "normal":
-                    policy_prior = MultivariateNormal(loc=torch.zeros(self.action_size), scale_tril=torch.ones(self.action_size).unsqueeze(0))
+                    policy_prior = MultivariateNormal(
+                        loc=torch.zeros(self.action_size),
+                        scale_tril=torch.ones(self.action_size).unsqueeze(0),
+                    )
                     policy_prior_log_probs = policy_prior.log_prob(actions_pred)
                 elif self._action_prior == "uniform":
                     policy_prior_log_probs = 0.0
-    
-                actor_loss = (alpha * log_pis.squeeze(0).cpu() - self.critic1(states, actions_pred.squeeze(0)).cpu() - policy_prior_log_probs ).mean()
+
+                actor_loss = (
+                    alpha * log_pis.squeeze(0).cpu()
+                    - self.critic1(states, actions_pred.squeeze(0)).cpu()
+                    - policy_prior_log_probs
+                ).mean()
             else:
-                
+
                 actions_pred, log_pis = self.actor_local.evaluate(states)
                 if self._action_prior == "normal":
-                    policy_prior = MultivariateNormal(loc=torch.zeros(self.action_size), scale_tril=torch.ones(self.action_size).unsqueeze(0))
+                    policy_prior = MultivariateNormal(
+                        loc=torch.zeros(self.action_size),
+                        scale_tril=torch.ones(self.action_size).unsqueeze(0),
+                    )
                     policy_prior_log_probs = policy_prior.log_prob(actions_pred)
                 elif self._action_prior == "uniform":
                     policy_prior_log_probs = 0.0
-    
-                actor_loss = (FIXED_ALPHA * log_pis.squeeze(0).cpu() - self.critic1(states, actions_pred.squeeze(0)).cpu()- policy_prior_log_probs ).mean()
+
+                actor_loss = (
+                    FIXED_ALPHA * log_pis.squeeze(0).cpu()
+                    - self.critic1(states, actions_pred.squeeze(0)).cpu()
+                    - policy_prior_log_probs
+                ).mean()
             # Minimize the loss
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
@@ -288,9 +345,7 @@ class Agent():
             # ----------------------- update target networks ----------------------- #
             self.soft_update(self.critic1, self.critic1_target, TAU)
             self.soft_update(self.critic2, self.critic2_target, TAU)
-                     
 
-    
     def soft_update(self, local_model, target_model, tau):
         """Soft update model parameters.
         θ_target = τ*θ_local + (1 - τ)*θ_target
@@ -298,10 +353,15 @@ class Agent():
         ======
             local_model: PyTorch model (weights will be copied from)
             target_model: PyTorch model (weights will be copied to)
-            tau (float): interpolation parameter 
+            tau (float): interpolation parameter
         """
-        for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
-            target_param.data.copy_(tau*local_param.data + (1.0-tau)*target_param.data)
+        for target_param, local_param in zip(
+            target_model.parameters(), local_model.parameters()
+        ):
+            target_param.data.copy_(
+                tau * local_param.data + (1.0 - tau) * target_param.data
+            )
+
 
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
@@ -316,53 +376,87 @@ class ReplayBuffer:
         self.action_size = action_size
         self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
         self.batch_size = batch_size
-        self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
+        self.experience = namedtuple(
+            "Experience",
+            field_names=["state", "action", "reward", "next_state", "done"],
+        )
         self.seed = random.seed(seed)
-    
+
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
         e = self.experience(state, action, reward, next_state, done)
         self.memory.append(e)
-    
+
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)
-        states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(device)
-        actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).float().to(device)
-        rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(device)
-        next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(device)
-        dones = torch.from_numpy(np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(device)
+        states = (
+            torch.from_numpy(np.vstack([e.state for e in experiences if e is not None]))
+            .float()
+            .to(device)
+        )
+        actions = (
+            torch.from_numpy(
+                np.vstack([e.action for e in experiences if e is not None])
+            )
+            .float()
+            .to(device)
+        )
+        rewards = (
+            torch.from_numpy(
+                np.vstack([e.reward for e in experiences if e is not None])
+            )
+            .float()
+            .to(device)
+        )
+        next_states = (
+            torch.from_numpy(
+                np.vstack([e.next_state for e in experiences if e is not None])
+            )
+            .float()
+            .to(device)
+        )
+        dones = (
+            torch.from_numpy(
+                np.vstack([e.done for e in experiences if e is not None]).astype(
+                    np.uint8
+                )
+            )
+            .float()
+            .to(device)
+        )
         return (states, actions, rewards, next_states, dones)
 
     def __len__(self):
         """Return the current size of internal memory."""
         return len(self.memory)
-    
-def SAC(n_episodes=200, max_t=500, print_every=10):
-# def SAC(n_episodes=200, max_t=500, print_every=10, d_model, max_len):
+
+
+def SAC(n_episodes=200, max_t=500, print_every=10, lr=0.001):
+    # def SAC(n_episodes=200, max_t=500, print_every=10, d_model, max_len):
     scores_deque = deque(maxlen=100)
     average_100_scores = []
     total_list = []
     total_avg_list = []
     best_states = []
-    version = (d_model, max_len)
+    version = (d_model, max_len, max_t, lr)
 
-    for i_episode in range(1, n_episodes+1):
+    for i_episode in range(1, n_episodes + 1):
 
         state = env.reset().view(1, -1)
         score = 0
         for t in range(max_t):
             action = agent.act(state)
             action_v = action.numpy()
-            action_v = np.clip(action_v*action_high, action_low, action_high)
+            action_v = np.clip(action_v * action_high, action_low, action_high)
             action_v = torch.tensor(action_v)
 
             next_state, reward, done = env.step(action_v)
-            next_state = next_state.reshape((1,state_size))
+            next_state = next_state.reshape((1, state_size))
             agent.step(state, action, reward, next_state, done, t)
             state = next_state
             score += reward
-        
+
         state_plus_reward = [reward, state]
 
         # store best 5 states
@@ -375,39 +469,50 @@ def SAC(n_episodes=200, max_t=500, print_every=10):
                 del best_states[min_index]
                 best_states.append(state_plus_reward)
 
-        if i_episode%50 == 0:
+        if i_episode % 50 == 0:
             bs = [(rs[0], rs[1]) for rs in best_states]
             for r, s in bs:
-                with open('result2/state_'+ str(version) + str(round(r, 3)) + '.pkl', 'wb') as f:
+                with open(
+                    "result2/state_" + str(version) + str(round(r, 3)) + ".pkl", "wb"
+                ) as f:
                     pickle.dump(s, f)
-        
+
         scores_deque.append(score)
-        writer.add_scalar("Reward", score, i_episode)
-        writer.add_scalar("average_X", np.mean(scores_deque), i_episode)
+        # writer.add_scalar("Reward", score, i_episode)
+        # writer.add_scalar("average_X", np.mean(scores_deque), i_episode)
         average_100_scores.append(np.mean(scores_deque))
-        
-        print('\rEpisode {} Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
+
+        print(
+            "\rEpisode {} Reward: {:.2f}  Average100 Score: {:.2f}".format(
+                i_episode, score, np.mean(scores_deque)
+            )
+        )
         total_list.append(score)
         total_avg_list.append(np.mean(scores_deque))
 
         # store score and average score
-        with open('result2/scores' + str(version) + '.pkl', 'wb') as f:
+        with open("result2/scores" + str(version) + ".pkl", "wb") as f:
             pickle.dump(total_list, f)
-        with open('result2/avg_scores' + str(version) + '.pkl', 'wb') as f:
+        with open("result2/avg_scores" + str(version) + ".pkl", "wb") as f:
             pickle.dump(total_avg_list, f)
 
         if i_episode % print_every == 0:
-            print('\rEpisode {}  Reward: {:.2f}  Average100 Score: {:.2f}'.format(i_episode, score, np.mean(scores_deque)))
+            print(
+                "\rEpisode {}  Reward: {:.2f}  Average100 Score: {:.2f}".format(
+                    i_episode, score, np.mean(scores_deque)
+                )
+            )
             total_list.append(score)
             total_avg_list.append(np.mean(scores_deque))
- 
-            with open('result2/scores' + str(version) + '.pkl', 'wb') as f:
+
+            with open("result2/scores" + str(version) + ".pkl", "wb") as f:
                 pickle.dump(total_list, f)
-            with open('result2/avg_scores' + str(version) + '.pkl', 'wb') as f:
+            with open("result2/avg_scores" + str(version) + ".pkl", "wb") as f:
                 pickle.dump(total_avg_list, f)
-            
+
     torch.save(agent.actor_local.state_dict(), args.info + ".pt")
-    
+
+
 def play():
     agent.actor_local.eval()
     for i_episode in range(1):
@@ -416,12 +521,13 @@ def play():
         for t in range(1000):
             action = agent.act(state)
             action_v = action.numpy()
-            action_v = np.clip(action_v*action_high, action_low, action_high)
+            action_v = np.clip(action_v * action_high, action_low, action_high)
             action_v = torch.tensor(action_v)
             next_state, reward, done = env.step(action_v)
-            next_state = next_state.reshape((1,state_size))
+            next_state = next_state.reshape((1, state_size))
             agent.step(state, action, reward, next_state, done, t)
             state = next_state
+
 
 # def play():
 #     agent.actor_local.eval()
@@ -439,22 +545,74 @@ def play():
 #             state = next_state
 
 #             if done:
-#                 break 
-    
+#                 break
+
 parser = argparse.ArgumentParser(description="")
-parser.add_argument("-env", type=str,default="Pendulum-v0", help="Environment name")
+parser.add_argument("-env", type=str, default="Pendulum-v0", help="Environment name")
 parser.add_argument("-info", type=str, help="Information or name of the run")
-parser.add_argument("-ep", type=int, default=100, help="The amount of training episodes, default is 100")
-parser.add_argument("-seed", type=int, default=0, help="Seed for the env and torch network weights, default is 0")
-parser.add_argument("-lr", type=float, default=5e-4, help="Learning rate of adapting the network weights, default is 5e-4")
-parser.add_argument("-a", "--alpha", type=float, help="entropy alpha value, if not choosen the value is leaned by the agent")
-parser.add_argument("-layer_size", type=int, default=256, help="Number of nodes per neural network layer, default is 256")
-parser.add_argument("-repm", "--replay_memory", type=int, default=int(1e6), help="Size of the Replay memory, default is 1e6")
-parser.add_argument("--print_every", type=int, default=100, help="Prints every x episodes the average reward over x episodes")
-parser.add_argument("-bs", "--batch_size", type=int, default=256, help="Batch size, default is 256")
-parser.add_argument("-t", "--tau", type=float, default=1e-2, help="Softupdate factor tau, default is 1e-2")
-parser.add_argument("-g", "--gamma", type=float, default=0.99, help="discount factor gamma, default is 0.99")
-parser.add_argument("--saved_model", type=str, default=None, help="Load a saved model to perform a test run!")
+parser.add_argument(
+    "-ep", type=int, default=100, help="The amount of training episodes, default is 100"
+)
+parser.add_argument(
+    "-seed",
+    type=int,
+    default=0,
+    help="Seed for the env and torch network weights, default is 0",
+)
+parser.add_argument(
+    "-lr",
+    type=float,
+    default=5e-4,
+    help="Learning rate of adapting the network weights, default is 5e-4",
+)
+parser.add_argument(
+    "-a",
+    "--alpha",
+    type=float,
+    help="entropy alpha value, if not choosen the value is leaned by the agent",
+)
+parser.add_argument(
+    "-layer_size",
+    type=int,
+    default=256,
+    help="Number of nodes per neural network layer, default is 256",
+)
+parser.add_argument(
+    "-repm",
+    "--replay_memory",
+    type=int,
+    default=int(1e6),
+    help="Size of the Replay memory, default is 1e6",
+)
+parser.add_argument(
+    "--print_every",
+    type=int,
+    default=100,
+    help="Prints every x episodes the average reward over x episodes",
+)
+parser.add_argument(
+    "-bs", "--batch_size", type=int, default=256, help="Batch size, default is 256"
+)
+parser.add_argument(
+    "-t",
+    "--tau",
+    type=float,
+    default=1e-2,
+    help="Softupdate factor tau, default is 1e-2",
+)
+parser.add_argument(
+    "-g",
+    "--gamma",
+    type=float,
+    default=0.99,
+    help="discount factor gamma, default is 0.99",
+)
+parser.add_argument(
+    "--saved_model",
+    type=str,
+    default=None,
+    help="Load a saved model to perform a test run!",
+)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -464,23 +622,26 @@ if __name__ == "__main__":
     TAU = args.tau
     HIDDEN_SIZE = args.layer_size
     BUFFER_SIZE = int(args.replay_memory)
-    BATCH_SIZE = args.batch_size        # minibatch size
-    LR_ACTOR = args.lr         # learning rate of the actor 
-    LR_CRITIC = args.lr        # learning rate of the critic
+    BATCH_SIZE = args.batch_size  # minibatch size
+    LR_ACTOR = args.lr  # learning rate of the actor
+    LR_CRITIC = args.lr  # learning rate of the critic
     FIXED_ALPHA = args.alpha
     saved_model = args.saved_model
-    
+
     t0 = time.time()
-    writer = SummaryWriter("runs/"+args.info)
+    # writer = SummaryWriter("runs/" + args.info)
 
     """
     d_model: dimension
     max_len: maxium length
     """
-    d_model = 5
+    d_model = 4
     max_len = 50
-    print('###################version###################')
-    print('This version is' + str((d_model, max_len)))
+    max_t = 1
+    print("###################version###################")
+    print("This version is " + str((d_model, max_len)))
+    print("Learning rate is " + str(args.lr))
+    print("One episode is " + str(max_t) + " steps")
     env = PE_GAME(d_model, max_len)
 
     """
@@ -504,14 +665,20 @@ if __name__ == "__main__":
     state_size = env.state_size
     action_size = env.action_size
 
-    agent = Agent(state_size=state_size, action_size=action_size, random_seed=seed,hidden_size=HIDDEN_SIZE, action_prior="uniform") #"normal"
-    
+    agent = Agent(
+        state_size=state_size,
+        action_size=action_size,
+        random_seed=seed,
+        hidden_size=HIDDEN_SIZE,
+        action_prior="uniform",
+    )  # "normal"
+
     if saved_model != None:
         agent.actor_local.load_state_dict(torch.load(saved_model))
         play()
-    else:    
-        SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every)
-        # SAC(n_episodes=args.ep, max_t=500, print_every=args.print_every, d_model, max_len)
+    else:
+        SAC(n_episodes=args.ep, max_t=max_t, print_every=args.print_every, lr=args.lr)
+        # SAC(n_episodes=args.ep, max_t=50, print_every=args.print_every)
     t1 = time.time()
     env.close()
-    print("training took {} min!".format((t1-t0)/60))
+    print("training took {} min!".format((t1 - t0) / 60))

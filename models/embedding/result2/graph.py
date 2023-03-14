@@ -1,11 +1,29 @@
 ﻿import matplotlib.pyplot as plt
 import pickle
 
-with open('scores.pkl', 'rb') as f:
+# d_model = 10
+# max_len = 10
+# version = (d_model, max_len, 500)
+
+d_model = 4
+max_len = 50
+max_t = 1
+lr = 2.5e-4
+# lr = 1e-5
+version = (d_model, max_len, max_t, lr)
+# version = (d_model, max_len)
+
+with open("scores" + str(version) + ".pkl", "rb") as f:
     total_list = pickle.load(f)
 
-with open('avg_scores.pkl', 'rb') as f:
+with open("avg_scores" + str(version) + ".pkl", "rb") as f:
     total_avg_list = pickle.load(f)
+
+# with open('scores.pkl', 'rb') as f:
+#     total_list = pickle.load(f)
+
+# with open('avg_scores.pkl', 'rb') as f:
+#     total_avg_list = pickle.load(f)
 
 # plt.plot(total_list)
 # plt.plot(total_avg_list)
