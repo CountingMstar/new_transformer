@@ -30,7 +30,8 @@ class EncoderLayer(nn.Module):
 
         # 2. add and norm
         x = self.dropout1(x)
-        x = self.norm1(x + _x)
+        # x = self.norm1(x + _x)
+        x = self.norm1(x)
 
         # 3. positionwise feed forward network
         _x = x
@@ -38,5 +39,6 @@ class EncoderLayer(nn.Module):
 
         # 4. add and norm
         x = self.dropout2(x)
-        x = self.norm2(x + _x)
+        # x = self.norm2(x + _x)
+        x = self.norm2(x)
         return x

@@ -19,13 +19,12 @@ def read(name):
 
 # ver = [10, 20, 30, 40]
 # ver = [50, 100, 150, 200, 250, 300, 350, 400, 450]
-ver = [2, 4, 6, 8, 12, 14, 16, 18, 22, 24, 26, 28]
+# ver = [2, 4, 6, 8, 12, 14, 16, 18, 22, 24, 26, 28]
+ver = [2, 4, 10, 20, 30, 40, 50]
 
-for version in ver:
-    print("%%%%%%%%%%%%")
-    print(version)
 
-    def draw(mode, version):
+def draw(mode):
+    for version in ver:
         version = str(version)
         if mode == "loss":
             # train = read('result/train_loss.txt')
@@ -39,17 +38,20 @@ for version in ver:
         elif mode == "bleu":
             # bleu = read("result/bleu.txt")
             bleu = read("result/bleu-" + version + ".txt")
-            plt.plot(bleu, "b", label="bleu score")
-            plt.legend(loc="lower right")
+            # plt.plot(bleu, "b", label="bleu score")
+            plt.plot(bleu, label="bleu score" + version)
+            plt.legend(loc="lower left")
+            # plt.xlim([0, 5])      # X축의 범위: [xmin, xmax]
+            plt.ylim([35, 45])  # Y축의 범위: [ymin, ymax]
 
-        plt.xlabel("epoch")
-        plt.ylabel(mode)
-        plt.title("training result")
-        plt.grid(True, which="both", axis="both")
-        plt.savefig("saved/transformer-base/" + mode + "-" + version)
-        # plt.show()
-        plt.cla()
+    plt.xlabel("epoch")
+    plt.ylabel(mode)
+    plt.title("training result")
+    plt.grid(True, which="both", axis="both")
+    plt.savefig("saved/transformer-base/total_" + mode + "-" + version)
+    plt.show()
 
-    if __name__ == "__main__":
-        draw(mode="loss", version=version)
-        draw(mode="bleu", version=version)
+
+if __name__ == "__main__":
+    # draw(mode="loss", version=version)
+    draw(mode="bleu")

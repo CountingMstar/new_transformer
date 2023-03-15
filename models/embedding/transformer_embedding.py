@@ -42,7 +42,6 @@ class TransformerEmbedding(nn.Module):
 
         # self.cat_tok_emb = TokenEmbedding(vocab_size, d_model - k)
         # self.cat_pos_emb = PostionalEncoding(k, max_len, device)
-
         self.cat_tok_emb = TokenEmbedding(vocab_size, d_model)
         self.cat_pos_emb = PostionalEncoding(k, max_len, device)
 
@@ -79,22 +78,15 @@ class TransformerEmbedding(nn.Module):
         # print(pos_emb)
         # print(cat_tok_emb.shape)
         # print(cat_pos_emb)
-
-        # tok_emb: 여러 문장에 대한 "토큰 임베딩"
-        # torch.Size([128, 34, 512])
-        # pos_emb: 각 문장에 대한 "포지셔널 임베딩"
-        # torch.Size([34, 512])
-        # torch.Size([128, 34, 512])
-
         model = SummationEmbedding(
-            tok_emb, pos_emb, cat_tok_emb, cat_pos_emb, self.linearlayer
+            tok_emb, pos_emb, cat_tok_emb, cat_pos_emb, self.linearlayer, self.d_model
         )
         """
         positional encoding type 결정
         """
-        # final_emb = model.summation()
+        final_emb = model.summation()
         # final_emb = model.concatenate()
-        final_emb = model.linear()
+        # final_emb = model.linear()
         # final_emb = model.autoencoder()
 
         # return self.drop_out(tok_emb + pos_emb)
@@ -104,7 +96,13 @@ class TransformerEmbedding(nn.Module):
 
 class SummationEmbedding(TransformerEmbedding):
     def __init__(
-        self, token_emb, positional_emb, cat_token_emb, cat_positional_emb, linearlayer
+        self,
+        token_emb,
+        positional_emb,
+        cat_token_emb,
+        cat_positional_emb,
+        linearlayer,
+        d_model,
     ):
         super(TransformerEmbedding, self).__init__()
 
@@ -113,8 +111,7 @@ class SummationEmbedding(TransformerEmbedding):
         self.cat_token_emb = cat_token_emb
         self.cat_positional_emb = cat_positional_emb
 
-        self.d_model = 512
-
+        self.d_model = d_model
         """
         from models.embedding.autoencoder import LinearLayer의
         linear layer 선언
@@ -131,33 +128,18 @@ class SummationEmbedding(TransformerEmbedding):
         # print(embedding.shape)
         return embedding
 
-    # def linear(self):
-    #     embedding = torch.cat([self.token_emb, self.positional_emb], 2)
-    #     batch_size, sentence_size, embedding_size = embedding.shape
-    #     embedding = embedding.view(batch_size*sentence_size, -1)
-    #     self.linearlayer = LinearLayer(embedding).to(device)
-    #     embedding = self.linearlayer(embedding)
-    #     embedding = embedding.view(batch_size, sentence_size, int(embedding_size/2))
-    #     return embedding
-
     def linear(self):
         """
         token embedding과 positional embedding을 결합하는 linear layer
         """
         # embedding = torch.cat([self.token_emb, self.positional_emb], 2)
         embedding = torch.cat([self.cat_token_emb, self.cat_positional_emb], 2)
-        # print("#######cat#####")
-        # print(embedding.shape)
-        # print(embedding[0].shape)
-        # x = self.cat_token_emb[0][5]
-        # print(x)
-        # print(torch.max(x))
-        # print(torch.min(x))
-        # print(torch.mean(x))
         batch_size, sentence_size, embedding_size = embedding.shape
         embedding = embedding.view(batch_size * sentence_size, -1)
 
-        # Residual Connection
+        """
+        Residual Connection
+        """
         residual = torch.split(embedding, self.d_model, dim=1)[0]
         embedding = self.linearlayer(embedding)
         embedding = embedding + residual

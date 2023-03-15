@@ -16,7 +16,8 @@ from util.bleu import idx_to_word, get_bleu
 from util.epoch_timer import epoch_time
 
 # k_list = [50, 100, 150, 200, 250, 300, 350, 400, 450]
-k_list = [10, 20, 30, 40]
+# k_list = [60, 70, 80, 90, 100]
+k_list = [512]
 
 for k in k_list:
 
@@ -149,21 +150,29 @@ for k in k_list:
 
             # if step % 100 == 0:
             #     torch.save(model.state_dict(), 'saved/model-{0}.pt'.format(step))
+
+            """
+            Version
+            """
             k_str = str(k)
+            # version = "_original"
+            version = "_noRESNET"
+
             if step >= 999:
                 torch.save(
-                    model.state_dict(), "saved/model-" + k_str + "-{0}.pt".format(step)
+                    model.state_dict(),
+                    "saved/model-" + k_str + version + "-{0}.pt".format(step),
                 )
 
-            f = open("result/train_loss-" + k_str + ".txt", "w")
+            f = open("result/train_loss-" + k_str + version + ".txt", "w")
             f.write(str(train_losses))
             f.close()
 
-            f = open("result/bleu-" + k_str + ".txt", "w")
+            f = open("result/bleu-" + k_str + version + ".txt", "w")
             f.write(str(bleus))
             f.close()
 
-            f = open("result/test_loss-" + k_str + ".txt", "w")
+            f = open("result/test_loss-" + k_str + version + ".txt", "w")
             f.write(str(test_losses))
             f.close()
 

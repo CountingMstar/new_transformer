@@ -20,8 +20,8 @@ from torch import nn
 class LinearLayer(nn.Module):
     def __init__(self, d_model, k, dropout=0.1):
         super(LinearLayer, self).__init__()
-        self.w_1 = nn.Linear(d_model + k, 512)
-        self.w_2 = nn.Linear(512, d_model)
+        self.w_1 = nn.Linear(d_model + k, 786)
+        self.w_2 = nn.Linear(786, d_model)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):

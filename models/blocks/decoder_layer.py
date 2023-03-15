@@ -33,7 +33,8 @@ class DecoderLayer(nn.Module):
         
         # 2. add and norm
         x = self.dropout1(x)
-        x = self.norm1(x + _x)
+        # x = self.norm1(x + _x)
+        x = self.norm1(x)
 
         if enc is not None:
             # 3. compute encoder - decoder attention
@@ -42,7 +43,8 @@ class DecoderLayer(nn.Module):
             
             # 4. add and norm
             x = self.dropout2(x)
-            x = self.norm2(x + _x)
+            # x = self.norm2(x + _x)
+            x = self.norm2(x)
 
         # 5. positionwise feed forward network
         _x = x
@@ -50,5 +52,6 @@ class DecoderLayer(nn.Module):
         
         # 6. add and norm
         x = self.dropout3(x)
-        x = self.norm3(x + _x)
+        # x = self.norm3(x + _x)
+        x = self.norm3(x)
         return x
