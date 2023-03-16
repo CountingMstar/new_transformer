@@ -156,7 +156,8 @@ for k in k_list:
             """
             k_str = str(k)
             # version = "_original"
-            version = "_noRESNET"
+            # version = "_noRESNET"
+            version = "test"
 
             if step >= 999:
                 torch.save(

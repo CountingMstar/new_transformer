@@ -19,9 +19,11 @@ def read(name):
 
 # ver = [10, 20, 30, 40]
 # ver = [50, 100, 150, 200, 250, 300, 350, 400, 450]
-ver = [2, 4, 6, 8, 12, 14, 16, 18, 22, 24, 26, 28]
+ver = [512]
 
 for version in ver:
+    type = "_noRESNET"
+    version = str(version) + type
     print("%%%%%%%%%%%%")
     print(version)
 
