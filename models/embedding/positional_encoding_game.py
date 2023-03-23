@@ -32,7 +32,7 @@ zero_encoding = torch.zeros(d_model * max_len)
 one_encoding = torch.ones(d_model * max_len)
 
 # proposed method
-score = -484.068
+score = -140.76
 with open("state_" + str(version) + str(score) + ".pkl", "rb") as f:
     total_list = pickle.load(f)
 # print('#####MAX#####')
@@ -47,11 +47,11 @@ linear = torch.tensor(x)
 
 env = PE_GAME(d_model, max_len)
 env.reset()
-# next_state, reward, done = env.step(pos_encoding)
+next_state, reward, done = env.step(pos_encoding)
 # next_state, reward, done = env.step(zero_encoding)
 # next_state, reward, done = env.step(one_encoding)
 # next_state, reward, done = env.step(linear)
-next_state, reward, done = env.step(total_list)
+# next_state, reward, done = env.step(total_list)
 
 print("#####reward#####")
 print(reward)

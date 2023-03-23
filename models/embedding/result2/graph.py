@@ -8,8 +8,8 @@ import pickle
 d_model = 4
 max_len = 50
 max_t = 1
-lr = 2.5e-4
-# lr = 1e-5
+# lr = 2.5e-4
+lr = 1e-4
 version = (d_model, max_len, max_t, lr)
 # version = (d_model, max_len)
 

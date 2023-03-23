@@ -1,11 +1,12 @@
 ﻿import torch
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 class PE_GAME:
     def __init__(self, d_model, max_len):
         super(PE_GAME, self).__init__()
         self.state = torch.zeros(max_len, d_model)
-        self.state_size = int(d_model * max_len) 
+        self.state_size = int(d_model * max_len)
         self.action_size = self.state_size
         self.max_len = max_len
         self.d_model = d_model
@@ -34,7 +35,7 @@ class PE_GAME:
                 # tmp = []
                 # tmp.append([i, x])
 
-                y = ((-1-(+1))/(self.max_len-1))*(x-i) + 1
+                y = ((-1 - (+1)) / (self.max_len - 1)) * (x - i) + 1
                 # print('y')
                 # print(y)
 
@@ -48,6 +49,7 @@ class PE_GAME:
         # print(reward_list)
         done = False
         return next_state, reward, done
+
 
 # d_model = 3
 # max_len = 4
